@@ -1,6 +1,6 @@
 import express from 'express'
 import { transfer } from './transaction'
-import { ApiError } from './errors/ApiError'
+import { errorHandler } from './middleware/errorHandler'
 
 const app = express()
 
@@ -12,7 +12,7 @@ app.get('/', (req, res) => {
     })
 })
 
-app.post('/transfers', async (req, res) => {
+app.post('/transfers', async (req, res, next) => {
     const { senderWalletId, receiverWalletId, amount } = req.body
 
     if ((!Number.isInteger(senderWalletId) || !Number.isInteger(receiverWalletId)) || (senderWalletId <= 0 || receiverWalletId <= 0)) {
@@ -32,6 +32,8 @@ app.post('/transfers', async (req, res) => {
 
     try {
 
+        
+
         const result = await transfer(
             senderWalletId, receiverWalletId, amount
         )
@@ -39,12 +41,12 @@ app.post('/transfers', async (req, res) => {
 
         res.status(200).json({ message: "transfer processed succesfully", result })
     } catch (error) {
-        if (error instanceof ApiError) {
-            res.status(error.statusCode).json({ message: error.message })
-        }
+        next(error)
     }
 
 })
+
+app.use(errorHandler) // registering the middleware
 
 app.listen(3000, () => {
     console.log('VAULT API running on port 3000')

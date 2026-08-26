@@ -92,7 +92,7 @@ export const transfer = async (
         if (creditTransfer.rowCount === 0) {
             throw new ApiError('Transaction could not be completed', 500)
         }
-        const createTransfer = await client.query(`
+        const transfer = await client.query(`
          
             INSERT INTO transfers (sender_wallet_id,receiver_wallet_id,ammount)
             VALUES($1,$2,$3)
@@ -106,7 +106,7 @@ export const transfer = async (
             INSERT INTO ledgers (wallet_id,transfer_id,transaction_type,amount)
             VALUES ($1,$2,$3,$4)
             `,
-            [senderWalletId, createTransfer.rows[0].id, 'debit', amount]
+            [senderWalletId, transfer.rows[0].id, 'debit', amount]
         )
 
         const creditLedger = await client.query(`
@@ -114,7 +114,7 @@ export const transfer = async (
             INSERT INTO ledgers (wallet_id,transfer_id,transaction_type,amount)
             VALUES ($1,$2,$3,$4)
             `,
-            [receiverWalletId, createTransfer.rows[0].id, 'credit', amount]
+            [receiverWalletId, transfer.rows[0].id, 'credit', amount]
         )
 
 
@@ -122,7 +122,7 @@ export const transfer = async (
         await client.query('COMMIT')
 
         return {
-            transferId: createTransfer.rows[0].id,
+            transferId: transfer.rows[0].id,
             senderWalletId,
             receiverWalletId,
             amount
