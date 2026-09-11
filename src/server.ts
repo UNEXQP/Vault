@@ -1,6 +1,7 @@
 import express from 'express'
 import { transfer } from './transaction'
 import { errorHandler } from './middleware/errorHandler'
+import { generateRequestHash } from './utils/idempotency'
 
 const app = express()
 
@@ -14,6 +15,12 @@ app.get('/', (req, res) => {
 
 app.post('/transfers', async (req, res, next) => {
     const { senderWalletId, receiverWalletId, amount } = req.body
+    const requestHash = generateRequestHash(senderWalletId, receiverWalletId, amount)
+    const idempotency = req.header('idempotency-key')
+
+    if (!idempotency) {
+        return res.status(400).json({ message: "idempotency key header is required" })
+    }
 
     if ((!Number.isInteger(senderWalletId) || !Number.isInteger(receiverWalletId)) || (senderWalletId <= 0 || receiverWalletId <= 0)) {
 
@@ -32,10 +39,10 @@ app.post('/transfers', async (req, res, next) => {
 
     try {
 
-        
+
 
         const result = await transfer(
-            senderWalletId, receiverWalletId, amount
+            senderWalletId, receiverWalletId, amount,idempotency,requestHash
         )
 
 

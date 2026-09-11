@@ -4,7 +4,9 @@ import { ApiError } from "./errors/ApiError";
 export const transfer = async (
     senderWalletId: number,
     receiverWalletId: number,
-    amount: number
+    amount: number,
+    idempotencyKey: number,
+    requestHash: number
 ) => {
 
     if (amount <= 0) {
@@ -36,14 +38,48 @@ export const transfer = async (
     try {
         await client.query('BEGIN')
 
+        const idempotencyRecord = await client.query(
+
+            `
+                   INSERT INTO idempotency_keys (keys,request_hash)
+                   VALUES ($1,$2)
+                   ON CONFLICT(keys) DO NOTHING
+                   RETURNING id
+
+                   `,
+            [idempotencyKey, requestHash]
+
+        )
+
+        //use on conflict to avoid db errors when the same idempotency key is used multiple times. If the key already exists, it will not insert a new record and will return an empty result set. This allows us to handle idempotent requests gracefully without causing duplicate transactions or errors in the database.
+
+        // key already exists
+        if (idempotencyRecord.rowCount === 0) {
+
+            const existingRecord = await client.query(`
+        SELECT key, request_hash, transfer_id
+        FROM idempotency_keys
+        WHERE key = $1
+        FOR UPDATE
+    `, [idempotencyKey])
+
+            if (existingRecord.rows[0].request_hash !== requestHash) {
+                throw new ApiError(
+                    'Idempotency key has already been used for a different request',
+                    409
+                )
+            }
+        }
+
+
         const lockedWallets = await client.query(`
-            
+
             SELECT id,balance
             FROM wallets
             WHERE id IN ($1,$2)
             ORDER BY id 
             FOR UPDATE
-            
+
             `,
             [senderWalletId, receiverWalletId]
         )
@@ -55,7 +91,7 @@ export const transfer = async (
         console.log(lockedWallets.rows)
 
         const debitTransfer = await client.query(`
-           
+
             UPDATE wallets 
             SET balance = balance - $1 
             WHERE id = $2
@@ -77,7 +113,7 @@ export const transfer = async (
 
 
         const creditTransfer = await client.query(`
-            
+
             UPDATE wallets 
             SET balance = balance + $1 
             WHERE id = $2
@@ -93,7 +129,7 @@ export const transfer = async (
             throw new ApiError('Transaction could not be completed', 500)
         }
         const transfer = await client.query(`
-         
+
             INSERT INTO transfers (sender_wallet_id,receiver_wallet_id,ammount)
             VALUES($1,$2,$3)
             RETURNING id
@@ -102,7 +138,7 @@ export const transfer = async (
         )
 
         const debitLedger = await client.query(`
-          
+
             INSERT INTO ledgers (wallet_id,transfer_id,transaction_type,amount)
             VALUES ($1,$2,$3,$4)
             `,
@@ -110,7 +146,7 @@ export const transfer = async (
         )
 
         const creditLedger = await client.query(`
-          
+
             INSERT INTO ledgers (wallet_id,transfer_id,transaction_type,amount)
             VALUES ($1,$2,$3,$4)
             `,
@@ -140,4 +176,9 @@ export const transfer = async (
     }
 
 }
+
+
+
+
+
 

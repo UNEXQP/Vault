@@ -7,7 +7,7 @@ export const errorHandler = (
     error: unknown, req: Request, res: Response, next: NextFunction
 ) => {
 
-    if (error instanceof ApiError) {
+    if (error instanceof ApiError) {  //wtf does instance of mean
       return  res.status(error.statusCode).json({ message: error.message })
     }
 
