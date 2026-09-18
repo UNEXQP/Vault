@@ -32,7 +32,7 @@ import { configDotenv } from "dotenv";
 configDotenv()
 
 
-const pool = new Pool({
+export const pool = new Pool({
     connectionString: process.env.DATABASE_URL, idleTimeoutMillis: 30000, connectionTimeoutMillis: 10000, ssl: process.env.NODE === "production" ? { rejectUnauthorized: false } : false // what does this mean
 })
 

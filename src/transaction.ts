@@ -1,24 +1,25 @@
 import { pool } from "./db";
 import { ApiError } from "./errors/ApiError";
 
+
 export const transfer = async (
     senderWalletId: number,
     receiverWalletId: number,
     amount: number,
-    idempotencyKey: number,
-    requestHash: number
+    idempotencyKey: string,
+    requestHash: string
 ) => {
 
     if (amount <= 0) {
-        return 'Amount must be greater than zero'
+        throw new ApiError('Amount must be greater than zero', 400)
     }
 
     if (senderWalletId === receiverWalletId) {
-        return 'Cannot transfer money to the same wallet'
+        throw new ApiError('Cannot transfer money to the same wallet', 400)
     }
 
     if (!Number.isFinite(amount)) {
-        return 'Amount must be finite'
+        throw new ApiError('Amount must be finite', 400)
     }
 
     if (
@@ -27,23 +28,25 @@ export const transfer = async (
         senderWalletId <= 0 ||
         receiverWalletId <= 0
     ) {
-        return 'Invalid wallet ID'
+        throw new ApiError('Invalid wallet ID', 400)
     }
 
 
 
-    const client = await pool.connect()
+const client = await pool.connect()
 
 
     try {
         await client.query('BEGIN')
 
+
+
         const idempotencyRecord = await client.query(
 
             `
-                   INSERT INTO idempotency_keys (keys,request_hash)
+                   INSERT INTO idempotency_keys (key,request_hash)
                    VALUES ($1,$2)
-                   ON CONFLICT(keys) DO NOTHING
+                   ON CONFLICT(key) DO NOTHING
                    RETURNING id
 
                    `,
@@ -69,7 +72,36 @@ export const transfer = async (
                     409
                 )
             }
+
+            if (existingRecord.rows[0].transfer_id) {
+                // this is to ask if the original operation actually completed successfully. If it did, we can return the cached result. If it didn't, we throw an error to indicate that the request is still being processed.
+                // already completed — return the cached result, this IS the idempotent replay
+                // if the request happened give me the details of the transfer that happened
+                const originalTransfer = await client.query(`
+        SELECT id, sender_wallet_id, receiver_wallet_id, ammount
+        FROM transfers
+        WHERE id = $1
+    `, [existingRecord.rows[0].transfer_id]
+
+                )
+
+
+                await client.query('COMMIT') // nothing to roll back, just release the lock
+
+                // return the same result so the client gets the same result it got from the first request
+                return {
+                    transferId: originalTransfer.rows[0].id,
+                    senderWalletId: originalTransfer.rows[0].sender_wallet_id,
+                    receiverWalletId: originalTransfer.rows[0].receiver_wallet_id,
+                    amount: originalTransfer.rows[0].ammount
+                }
+            } else {
+                // key claimed but never finished — genuinely still in flight, or a prior attempt died mid-transaction
+                throw new ApiError('Idempotent request is still being processed', 409)
+            }
         }
+
+
 
 
         const lockedWallets = await client.query(`
@@ -137,7 +169,13 @@ export const transfer = async (
             [senderWalletId, receiverWalletId, amount]
         )
 
-        const debitLedger = await client.query(`
+        await client.query(`
+    UPDATE idempotency_keys
+    SET transfer_id = $1
+    WHERE key = $2
+`, [transfer.rows[0].id, idempotencyKey])
+
+        await client.query(`
 
             INSERT INTO ledgers (wallet_id,transfer_id,transaction_type,amount)
             VALUES ($1,$2,$3,$4)
@@ -145,7 +183,7 @@ export const transfer = async (
             [senderWalletId, transfer.rows[0].id, 'debit', amount]
         )
 
-        const creditLedger = await client.query(`
+        await client.query(`
 
             INSERT INTO ledgers (wallet_id,transfer_id,transaction_type,amount)
             VALUES ($1,$2,$3,$4)
@@ -176,9 +214,3 @@ export const transfer = async (
     }
 
 }
-
-
-
-
-
-
