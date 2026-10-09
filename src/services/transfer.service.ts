@@ -1,5 +1,5 @@
-import { pool } from "./db";
-import { ApiError } from "./errors/ApiError";
+import { pool } from "../db"
+import { ApiError } from "../errors/ApiError"
 
 
 export const transfer = async (
@@ -33,7 +33,7 @@ export const transfer = async (
 
 
 
-const client = await pool.connect()
+    const client = await pool.connect()
 
 
     try {
@@ -160,6 +160,8 @@ const client = await pool.connect()
         if (creditTransfer.rowCount === 0) {
             throw new ApiError('Transaction could not be completed', 500)
         }
+
+        
         const transfer = await client.query(`
 
             INSERT INTO transfers (sender_wallet_id,receiver_wallet_id,ammount)

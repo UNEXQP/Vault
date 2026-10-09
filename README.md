@@ -33,3 +33,23 @@ Balance reads are fast (Redis) but never wrong (PostgreSQL is truth)
    │  Redis  │          │PostgreSQL│         │ Webhook  │
    │ (Cache) │          │ (Ledger) │         │  Queue   │
    └─────────┘          └──────────┘         └──────────┘
+
+
+
+my explnation of the login flow 
+
+
+user sends both email and password to the db 
+-- the password senst is then hashed and comapred to the hash i the db 
+-- if correct we proceed else error
+-- the comparison is done by selecting both the id the email and the password from the users table then 
+-- then use a varriable to represent the user password then use bcrypt comapre to compare them
+
+creating token using jwt
+-- we first make a create token function where:
+     well use jwt.sign to for user id and add the ammount of time that token is allowed to be relevant with the jwt secret key
+-- using the create token function:
+    we want to remmber that the token is user id that can also be described as the id of the row the email were using to log in so we use he create token function while passing r userid as an argiment
+
+-- auth middleware 
+   we first have to determine what our token will be so the token from the create token function will be put next to our bearer and this will be used to identify what each user will be allowed to do     
