@@ -3,6 +3,7 @@ import { ApiError } from "../errors/ApiError"
 
 
 export const transfer = async (
+    userId: number,
     senderWalletId: number,
     receiverWalletId: number,
     amount: number,
@@ -105,15 +106,15 @@ export const transfer = async (
 
 
         const lockedWallets = await client.query(`
-
-            SELECT id,balance
-            FROM wallets
-            WHERE id IN ($1,$2)
-            ORDER BY id 
-            FOR UPDATE
+SELECT id, balance
+FROM wallets
+WHERE id IN ($1, $2)
+AND (id <> $1 OR user_id = $3)
+ORDER BY id
+FOR UPDATE
 
             `,
-            [senderWalletId, receiverWalletId]
+            [senderWalletId, receiverWalletId, userId]
         )
 
         if (lockedWallets.rowCount !== 2) {
@@ -161,7 +162,7 @@ export const transfer = async (
             throw new ApiError('Transaction could not be completed', 500)
         }
 
-        
+
         const transfer = await client.query(`
 
             INSERT INTO transfers (sender_wallet_id,receiver_wallet_id,ammount)

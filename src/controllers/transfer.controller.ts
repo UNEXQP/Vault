@@ -47,9 +47,14 @@ export const createTransfer = async (
             throw new ApiError("this wallet does not belong to you", 403)
         }
 
-        const result = await transfer(
-            senderWalletId, receiverWalletId, amount, idempotencyKey, requestHash
-        )
+     const result = await transfer(
+    req.userId!,
+    senderWalletId,
+    receiverWalletId,
+    amount,
+    idempotencyKey,
+    requestHash
+)
 
 
         res.status(200).json({ message: "transfer processed succesfully", result })

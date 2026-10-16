@@ -8,10 +8,11 @@ type JwtPayload = {
     userId: number
 }
 
-const jwtSecret = process.env.JWT_SECRET
 
 
 export const authMiddleware = (req: Request, res: Response, next: NextFunction) => {
+
+    const jwtSecret = process.env.JWT_SECRET
 
     const authHeader = req.header("Authorization")
 
@@ -31,16 +32,20 @@ export const authMiddleware = (req: Request, res: Response, next: NextFunction) 
 
 
 
+        if (!jwtSecret) {
+            return next(new ApiError("server configuration error", 500))
+        }
+
         const decoded = jwt.verify(token, jwtSecret) as JwtPayload
 
         req.userId = decoded.userId
         next()
     } catch (error) {
-        next( new ApiError("invalid token",401))
+        next(new ApiError("invalid token", 401))
     }
 
 
 
-} 
+}
 
 

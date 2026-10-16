@@ -7,8 +7,6 @@ import { transfer } from "../services/transfer.service"
 //tobe
 
 
-
-
 jest.mock("../db", () => ({
     pool: {
         query: jest.fn(),
@@ -176,7 +174,7 @@ describe("were going to test the transfer function", () => {
 
         pool.connect = jest.fn().mockResolvedValue(fakeTransferClient)
 
-        const result = await transfer(1, 2, 3000, "test-key", "test-hash")
+        const result = await transfer(1, 1, 2, 3000, "test-key", "test-hash")
 
         expect(result).toEqual({
 
@@ -225,7 +223,7 @@ describe("were going to test the insufficient balance function", () => {
 
         pool.connect = jest.fn().mockResolvedValue(fakeInsufficientClient)
 
-        const result = transfer(1, 2, 40000, "test-key", "test-hash")
+        const result = transfer(1, 1, 2, 3000, "test-key", "test-hash")
 
         await expect(result).rejects.toThrow("Insufficient balance")
         expect(fakeInsufficientClient.query).toHaveBeenCalledWith("ROLLBACK")
@@ -272,7 +270,7 @@ describe("this is is a test for nonexistentwallets", () => {
 
         pool.connect = jest.fn().mockResolvedValueOnce(fakeWwalletClient)
 
-        const result = transfer(100, 2, 10000, "test-key", "test-hash")
+        const result = transfer(1, 1, 2, 3000, "test-key", "test-hash")
 
         await expect(result).rejects.toThrow('One or both wallets do not exist')
         expect(fakeWwalletClient.query).toHaveBeenCalledWith("ROLLBACK")
@@ -320,7 +318,7 @@ describe("this is the idempotency test", () => {
 
         pool.connect = jest.fn().mockResolvedValue(idemTest)
 
-        const result = await transfer(1, 2, 40000, "test-key", "test-hash")
+        const result = await transfer(1, 1, 2, 3000, "test-key", "test-hash")
         expect(result).toEqual({
             transferId: 100,
             senderWalletId: 1,
@@ -358,7 +356,7 @@ describe("this is to test the idempotency failure", () => {
 
         pool.connect = jest.fn().mockResolvedValue(idempfailureTest)
 
-        const result = transfer(1, 2, 4000, "test-key", "test-hash")
+        const result = transfer(1, 1, 2, 3000, "test-key", "test-hash")
 
         await expect(result).rejects.toThrow('Idempotency key has already been used for a different request')
         expect(idempfailureTest.query).toHaveBeenCalledWith("ROLLBACK")
